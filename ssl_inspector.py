@@ -52,10 +52,44 @@ def draw_menu(stdscr, selected_idx): #{
 #            std
 #        elif key==curses.KEY_LEFT:
 
-def load_certificates(path_to_dir): #{
+def load_certificates(c, path_to_dir): #{
+    list_of_files = os.listdir(path_to_dir)
+    if len(list_of_files) == 0:
+        return 0
+    else:
+        test = 0
+        for filename in list_of_files:
+            print(filename)
+            user = cert_reader(path_to_dir, filename)
+            c.execute('insert into users values (?,?,?,?,?,?,?,?,?,?)', user)
+        return 1
     
 #}
 
+def cert_reader(path_to_dir, path_to_file): #{
+        #Load certificate from file as string
+        file = open(path_to_dir + "/" + path_to_file, "r")
+        cert_str = file.read()
+        filename = path_to_file
+        file.close()
+        #Creating x509 object
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM,cert_str)
+        #Parsing important information from object as tuple
+        x509_subject = cert.get_subject()
+        subject = x509_subject.get_components()
+        #Creating a tuple which will be returned
+        serial_num = cert.get_serial_number()
+        notBefore = cert.get_notBefore().decode('UTF-8')
+        notAfter = cert.get_notAfter().decode('UTF-8')
+        C = subject[0][1].decode('UTF-8')
+        ST = subject[1][1].decode('UTF-8')
+        O = subject[2][1].decode('UTF-8')
+        OU = subject[3][1].decode('UTF-8')
+        CN = subject[4][1].decode('UTF-8')
+        emailAddress = subject[5][1].decode('UTF-8')
+        person = (serial_num, filename, notBefore, notAfter, C, ST, O, OU, CN, emailAddress)
+        return person
+#}
 
 #def list_certificates(c, option):
 #    for row in c.execute('select count (not_after) from users where not_after <' +  time):
@@ -71,6 +105,11 @@ def main(stdscr): #{
     draw_menu(stdscr, current_row)
     h, w = stdscr.getmaxyx()
 
+    #db variable
+    conn = sqlite3.connect(':memory:')
+    c = conn.cursor()
+    c.execute('CREATE TABLE users (serial_num int, file_name text, not_before text, not_after text, C text, ST text, O text, OU text, CN text, email text)')
+
     while 1:
         key = stdscr.getch()
         if key==curses.KEY_UP and current_row > 0:
@@ -84,8 +123,16 @@ def main(stdscr): #{
             #stdscr.refresh()
             #stdscr.getch()
             if current_row == 0:    #   Load certificates
-                time.sleep(0.1)
+                path_to_dir = "__some__path__"
+                return_value = load_certificates(c, path_to_dir)
+                stdscr.clear()
+                stdscr.addstr(h//2, w//2, str(return_value))
+                for idx, row in enumerate(c.execute('select * from users')):
+                    stdscr.addstr(h//2-idx, w//3, str(row))
+                stdscr.refresh()
+                time.sleep(2)
             elif current_row == 1:  #   List certificates
+                #list_certificates()
                 time.sleep(0.1)
             elif current_row == 2:  #   exit 
                 exit(1)
