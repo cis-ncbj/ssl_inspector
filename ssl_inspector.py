@@ -8,6 +8,7 @@ from OpenSSL import crypto
 from datetime import datetime
 import random as rd
 import os
+from curses.textpad import rectangle
 
 
 #Global variable with menu items
@@ -142,27 +143,40 @@ def cert_reader(stdscr, path_to_dir, path_to_file): #{
         return person
 #}
 
+#Gathering user input with path to directory with certs
+def load_certs_input(stdscr, c): #{
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    info = "Enter path to directory with certificates:"
+    stdscr.addstr(h//2-10, w//2-len(info)//2, info)
+    editwin = curses.newwin(1,100, h//2-5, w//2-50)
+    rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
+    stdscr.refresh()
+    box = curses.textpad.Textbox(editwin)
+    # Let the user edit until Ctrl-G is struck.
+    box.edit()
+    # Get resulting contents
+    message = box.gather()
+    return message[:-1]
+#}
+
 #Loading certs from files
 def load_certificates(stdscr, c, path_to_dir): #{
     stdscr.clear()
     h, w = stdscr.getmaxyx()
-    list_of_files = os.listdir(path_to_dir)
-    if len(list_of_files) == 0:
-        #stdscr.clear()
+    path_to_dir = load_certs_input(stdscr, c)
+    if not os.path.exists(path_to_dir):
         text = "Failed to load certificates. [ PRESS ANY KEY ]"
         stdscr.addstr(h//2, w//2-len(text)//2, text)
         stdscr.getch()
     else:
-        test = 0
+        list_of_files = os.listdir(path_to_dir)
         for filename in list_of_files:
             user = cert_reader(stdscr, path_to_dir, filename)
             c.execute('insert into users values (?,?,?,?,?,?,?,?,?,?)', user)
-        #stdscr.clear()
         text = "Loaded certificates to database. [ PRESS ANY KEY ]"
         stdscr.addstr(h//2, w//2-len(text)//2, text)
         stdscr.getch()
-  
-
 #}
 
 def gen_random_users(stdscr, conn, c, n): #{
