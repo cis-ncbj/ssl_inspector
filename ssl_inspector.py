@@ -11,7 +11,7 @@ import os
 
 
 #Global variable with menu items
-main_menu= ("Load certificates", "List certificates", "Test options", "Exit")
+main_menu= ("Load certificates from directory", "Load certificates from database", "List certificates", "Test options", "Exit")
 test_menu = ("Generate random users and add to database", "List random users", "Return to main menu")
 exit_menu = ("Do you want to save database?","YES", "NO")
 
@@ -165,12 +165,6 @@ def load_certificates(stdscr, c, path_to_dir): #{
 
 #}
 
-#def list_certificates(c, option):
-#    for row in c.execute('select count (not_after) from users where not_after <' +  time):
-#        print(row)
-#    for row in c.execute('select * from users where not_after <' +  time):
-#        print(row)
-
 def gen_random_users(stdscr, conn, c, n): #{
     with open("names.txt", "r") as f_names:
         names = f_names.read().splitlines()
@@ -283,6 +277,7 @@ def list_users_fun(stdscr, conn, c): #{
     #    time.sleep(2)
     list_users(stdscr, users, pos, option)
     while 1:
+        prev_option = option
         key = stdscr.getch()
         if key==curses.KEY_UP and pos > 0:
             pos -= 1
@@ -293,6 +288,8 @@ def list_users_fun(stdscr, conn, c): #{
         elif key == 122 and pos + h < len(users)-h+2:
             pos += h
         elif key == 99:
+            if prev_option == 1:
+                option == 0
             option = 1
             list_users(stdscr, users, pos, option) 
         elif key == 101:
@@ -335,22 +332,17 @@ def main_menu_fun(stdscr, conn, c): #{
         key = stdscr.getch()
         if key==curses.KEY_UP and current_row > 0:
             current_row -= 1
-        elif key==curses.KEY_DOWN and current_row < 3:
+        elif key==curses.KEY_DOWN and current_row < 4:
             current_row += 1
         elif key==curses.KEY_ENTER or key in [10,13]:
-            #text = "You have pressed {}".format(main_menu[current_row])
-            #stdscr.clear()
-            #stdscr.addstr(0, 0, text)
-            #stdscr.refresh()
-            #stdscr.getch()
-            if current_row == 0:    #   Load certificates
-                path_to_dir = "/home/kuba/Dropbox/Programowanie/Python/Projekty/LDAP/certs"
+            if current_row == 0:    #   Load certificates from directory
+                path_to_dir = "_path_to_dir_"
                 load_certificates(stdscr , c, path_to_dir)
-            elif current_row == 1:  #   List certificates
+            elif current_row == 2:  #   List certificates
                 list_users_fun(stdscr, conn, c)
-            elif current_row == 2:  #   Enter Test menu
+            elif current_row == 3:  #   Enter Test menu
                 test_menu_fun(stdscr, conn, c)
-            elif current_row == 3:  #   exit 
+            elif current_row == 4:  #   exit 
                 exit_menu_fun(stdscr, conn, c)
                 #exit(1)
         draw_menu(stdscr, current_row)
