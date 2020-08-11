@@ -142,7 +142,7 @@ def cert_reader(stdscr, path_to_dir, path_to_file): #{
 def load_certs_input(stdscr, c): #{
     stdscr.clear()
     h, w = stdscr.getmaxyx()
-    info = "Enter path to directory with certificates [to end press Ctrl-G]:"
+    info = "Enter path to directory with certificates [to end press Ctrl-G or ENTER ]:"
     stdscr.addstr(h//2-10, w//2-len(info)//2, info)
     editwin = curses.newwin(1,100, h//2-5, w//2-50)
     rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
