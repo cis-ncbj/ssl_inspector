@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 
 # [x] Toggle list
-# [ ] Sorting list by everything
+# [x] Sorting list by everything
 # [ ] Statistics and graphs
 # [ ] ... ?
 
@@ -14,13 +14,14 @@ from datetime import datetime
 import random as rd
 import os
 from curses.textpad import rectangle
+from operator import itemgetter
 
 
 #Global variable with menu items
 main_menu= ("Load certificates from directory", "Load certificates from database", "List certificates", "Test options", "Exit")
 test_menu = ("Generate random users and add to database", "List random users", "Return to main menu")
 exit_menu = ("Do you want to save database?","YES", "NO")
-sort_menu = ("Sorting by:", "ID", "File name", "Not before", "Not after", "Country", "State", "Object", "Object unit", "Name", "Surname", "Email Address")
+sort_menu = ("ID", "File name", "Not before", "Not after", "Country", "State", "Object", "Object unit", "Name", "Email Address")
 
 test_menu_sign = (
                   "______________________ ____________________    _____  ___________ _______   ____ ___  ",
@@ -140,21 +141,62 @@ def cert_reader(stdscr, path_to_dir, path_to_file): #{
         CN = subject[4][1].decode('UTF-8')
         emailAddress = subject[5][1].decode('UTF-8')
         person = (serial_num, filename, notBefore, notAfter, C, ST, O, OU, CN, emailAddress)
-        #stdscr.addstr(1,1,person[1])
         return person
 #}
 
-def sort_menu_fun(stdscr):
-    h, w = stdscr.getmaxyx()
-    #rectangle(stdscr, h//2-11, w//2-21, h//2+6, w//2+20)
-    sortwin = curses.newwin(15, 40, h//2-10, w//2-20)
-    stdscr.attron(curses.color_pair(4))
-    #sortwin.bkgd(curses.color_pair(2))
-    sortwin.erase()
+def draw_sort_menu(sortwin, pos, h, w):
+    sortwin.clear()
+    sortwin.border()
+    sort = "Sort by"
+    sortwin.addstr(0,w//2-len(sort)//2,sort, curses.color_pair(1))
+    for idx, menu in enumerate(sort_menu):
+        if idx == pos:
+            sortwin.attron(curses.color_pair(1))
+            sortwin.addstr(idx+2,w//2-len(menu)//2, menu)    
+            sortwin.attroff(curses.color_pair(1))
+        else:
+            sortwin.addstr(idx+2,w//2-len(menu)//2, menu)    
     sortwin.refresh()
-    sortwin.addstr(1,1,"Hello")
-    stdscr.refresh()
-    stdscr.getch()
+    
+
+def sort_menu_fun(stdscr, users):
+    h, w = stdscr.getmaxyx()
+    sortwin = curses.newwin(15, 40, h//2-10, w//2-20)
+    h, w = sortwin.getmaxyx()
+    pos = 0 
+    #stdscr.attron(curses.color_pair(3))
+    #sortwin.bkgd(curses.color_pair(2))
+    #sortwin.erase()
+    draw_sort_menu(sortwin, pos, h, w)
+    while True:
+        key = stdscr.getch()
+        if key==curses.KEY_UP and pos > 0:
+            pos -= 1
+        elif key==curses.KEY_DOWN and pos < len(sort_menu)-1:
+            pos += 1
+        elif key==curses.KEY_ENTER or key in [10,13]:
+            if pos == 0:
+                users.sort(key=itemgetter(0))
+            elif pos == 1:
+                users.sort(key=itemgetter(1))
+            elif pos == 2:
+                users.sort(key=itemgetter(2))
+            elif pos == 3:
+                users.sort(key=itemgetter(3))
+            elif pos == 4:
+                users.sort(key=itemgetter(4))
+            elif pos == 5:
+                users.sort(key=itemgetter(5))
+            elif pos == 6:
+                users.sort(key=itemgetter(6))
+            elif pos == 7:
+                users.sort(key=itemgetter(7))
+            elif pos == 8:
+                users.sort(key=itemgetter(8))
+            elif pos == 9:
+                users.sort(key=itemgetter(9))
+            break
+        draw_sort_menu(sortwin, pos, h, w)
 
 #Gathering user input with path to directory with certs
 def load_certs_input(stdscr, c): #{
@@ -243,11 +285,11 @@ def list_users(stdscr, users, pos, option): #{
     OU = '{0:<18}'.format("OBJECT UNIT")
     CN = '{0:<25}'.format("NAME SURNAME")
     email = '{0:<30}'.format("EMAIL ADDRESS")
-    top = serial_num + filename + not_before + " " + not_after + " " + C + ST + O + OU + CN + email
+    top = serial_num + filename + not_before + " " + not_after + " " + C + ST + O + OU + CN + email + " " + str(pos) + " | " +  str(len(users))
     stdscr.attron(curses.color_pair(1))
     stdscr.addstr(0, 1, top)
     stdscr.attroff(curses.color_pair(1))
-####
+#
     if len(users) == 0:
        warning = "Your database is empty. Fill it with random users, or load from files."
        warning2 = "[ press 'q' to quit ]"
@@ -258,7 +300,7 @@ def list_users(stdscr, users, pos, option): #{
         #    var = 2
         #else:
         #    var = len(users)
-        for i in range(0,min(h,len(users))-1):
+        for i in range(0,min(h,len(users))-2):
             serial_num = '{0:<5}'.format(users[pos+i][0])
             filename = '{0:<20}'.format(users[pos+i][1])
             not_before = users[pos+i][2]
@@ -317,9 +359,15 @@ def list_users_fun(stdscr, conn, c): #{
         elif key==curses.KEY_DOWN and pos < len(users)-h+2:
             pos += 1
         elif key == 97 and pos > 0:
-            pos -= h
-        elif key == 122 and pos + h < len(users)-h+2:
-            pos += h
+            if pos < h-2:
+                pos = 0
+            else:
+                pos -= h-2
+        elif key == 122 :
+            if  len(users)-pos+2 < 2*h: 
+                pos = len(users) - h + 2
+            else:
+                pos += h-2
         elif key == 99:
             tmp_users = users
             if color_on == True:
@@ -343,8 +391,7 @@ def list_users_fun(stdscr, conn, c): #{
         elif key == 113:
             break
         elif key == 115:
-            tmp_users = users
-            sort_menu_fun(stdscr)
+            sort_menu_fun(stdscr, tmp_users)
         list_users(stdscr, tmp_users, pos, option)
 #}
 
