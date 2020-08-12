@@ -1,5 +1,10 @@
 #! /usr/bin/python3
 
+# [x] Toggle list
+# [ ] Sorting list by everything
+# [ ] Statistics and graphs
+# [ ] ... ?
+
 #Importing modules
 import curses
 import time
@@ -15,6 +20,7 @@ from curses.textpad import rectangle
 main_menu= ("Load certificates from directory", "Load certificates from database", "List certificates", "Test options", "Exit")
 test_menu = ("Generate random users and add to database", "List random users", "Return to main menu")
 exit_menu = ("Do you want to save database?","YES", "NO")
+sort_menu = ("Sorting by:", "ID", "File name", "Not before", "Not after", "Country", "State", "Object", "Object unit", "Name", "Surname", "Email Address")
 
 test_menu_sign = (
                   "______________________ ____________________    _____  ___________ _______   ____ ___  ",
@@ -138,6 +144,18 @@ def cert_reader(stdscr, path_to_dir, path_to_file): #{
         return person
 #}
 
+def sort_menu_fun(stdscr):
+    h, w = stdscr.getmaxyx()
+    #rectangle(stdscr, h//2-11, w//2-21, h//2+6, w//2+20)
+    sortwin = curses.newwin(15, 40, h//2-10, w//2-20)
+    stdscr.attron(curses.color_pair(4))
+    #sortwin.bkgd(curses.color_pair(2))
+    sortwin.erase()
+    sortwin.refresh()
+    sortwin.addstr(1,1,"Hello")
+    stdscr.refresh()
+    stdscr.getch()
+
 #Gathering user input with path to directory with certs
 def load_certs_input(stdscr, c): #{
     stdscr.clear()
@@ -207,12 +225,14 @@ def gen_random_users(stdscr, conn, c, n): #{
     stdscr.getch()
 #}
 
+
 #20060618000000Z
 def list_users(stdscr, users, pos, option): #{
     now = datetime.now()
     today = now.strftime("%Y%m%d%H%M%S")
     h, w = stdscr.getmaxyx()
     stdscr.clear()
+    #HEADLINE OF LIST
     serial_num = '{0:<5}'.format("SNUM")
     filename = '{0:<20}'.format("FILENAME")
     not_before = '{0:<15}'.format("NOT BEFORE")
@@ -227,17 +247,18 @@ def list_users(stdscr, users, pos, option): #{
     stdscr.attron(curses.color_pair(1))
     stdscr.addstr(0, 1, top)
     stdscr.attroff(curses.color_pair(1))
+####
     if len(users) == 0:
        warning = "Your database is empty. Fill it with random users, or load from files."
        warning2 = "[ press 'q' to quit ]"
        stdscr.addstr(h//2-1, w//2-len(warning)//2, warning) 
        stdscr.addstr(h//2+1, w//2-len(warning2)//2, warning2) 
     else:
-        if len(users) == 1:
-            var = 2
-        else:
-            var = len(users)
-        for i in range(0,min(h,var)-1):
+        #if len(users) == 1:
+        #    var = 2
+        #else:
+        #    var = len(users)
+        for i in range(0,min(h,len(users))-1):
             serial_num = '{0:<5}'.format(users[pos+i][0])
             filename = '{0:<20}'.format(users[pos+i][1])
             not_before = users[pos+i][2]
@@ -261,29 +282,32 @@ def list_users(stdscr, users, pos, option): #{
                     stdscr.addstr(i+1, 1, record)
                     stdscr.attroff(curses.color_pair(3))
             elif option == 2:
-                if not_after < today:
-                    stdscr.attron(curses.color_pair(3))
-                    stdscr.addstr(i+1, 1, record)
-                    stdscr.attroff(curses.color_pair(3))
+            #    if not_after < today:
+                    #stdscr.attron(curses.color_pair(3))
+                stdscr.addstr(i+1, 1, record, curses.color_pair(3))
+                    #stdscr.attroff(curses.color_pair(3))
     stdscr.attron(curses.color_pair(1))
-    stdscr.addstr(h-1,1,"q - quit | up_arrow - up | down_arrow - down | e - show expired | c - color list | a - page up | z - page down" )
+    stdscr.addstr(h-1,1,"q - quit | up_arrow - up | down_arrow - down | e - show expired | c - color list | a - page up | z - page down | s - sort list" )
     stdscr.attroff(curses.color_pair(1))
     stdscr.refresh()
 #}
 
 def list_users_fun(stdscr, conn, c): #{
+    now = datetime.now()
+    today = now.strftime("%Y%m%d%H%M%S")
     stdscr.clear()
     h, w = stdscr.getmaxyx()
     users = []
-    pos = 0
+    tmp_users = users
+    expired_users = []
     option = 0
+    color_on = False
+    expired_on = False
+    pos = 0
     for row in c.execute("select * from users"):
         users.append(row)
-    #if len(users) > 0:
-    #    stdscr.clear()
-    #    stdscr.addstr(1,1,users[0][8])
-    #    stdscr.refresh()
-    #    time.sleep(2)
+    for row in c.execute("select * from users where not_after < " +  today):
+        expired_users.append(row)
     list_users(stdscr, users, pos, option)
     while 1:
         prev_option = option
@@ -297,16 +321,31 @@ def list_users_fun(stdscr, conn, c): #{
         elif key == 122 and pos + h < len(users)-h+2:
             pos += h
         elif key == 99:
-            if prev_option == 1:
-                option == 0
-            option = 1
-            list_users(stdscr, users, pos, option) 
+            tmp_users = users
+            if color_on == True:
+                color_on = False
+                option = 0
+            else:
+                color_on = True
+                option = 1
+            list_users(stdscr, tmp_users, pos, option) 
         elif key == 101:
-            option = 2 
-            list_users(stdscr, users, pos, option) 
+            if expired_on == True:
+                tmp_users = users
+                expired_on = False
+                option = 0
+            else:
+                tmp_users = expired_users
+                expired_on = True
+                color_on = False
+                option = 2 
+            list_users(stdscr, tmp_users, pos, option) 
         elif key == 113:
             break
-        list_users(stdscr, users, pos, option)
+        elif key == 115:
+            tmp_users = users
+            sort_menu_fun(stdscr)
+        list_users(stdscr, tmp_users, pos, option)
 #}
 
 def test_menu_fun(stdscr, conn, c): #{
@@ -334,6 +373,7 @@ def main_menu_fun(stdscr, conn, c): #{
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_GREEN)
     curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_RED)
+    curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLACK)
     current_row = 0
     draw_menu(stdscr, current_row)
     h, w = stdscr.getmaxyx()
