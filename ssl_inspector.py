@@ -2,7 +2,8 @@
 
 # [x] Toggle list
 # [x] Sorting list by everything
-# [ ] Statistics and graphs
+# [ ] Statistics
+# [ ] Graphs
 # [ ] ... ?
 
 #Importing modules
@@ -144,7 +145,7 @@ def cert_reader(stdscr, path_to_dir, path_to_file): #{
         return person
 #}
 
-def draw_sort_menu(sortwin, pos, h, w):
+def draw_sort_menu(sortwin, pos, h, w): #{
     sortwin.clear()
     sortwin.border()
     sort = "Sort by"
@@ -157,9 +158,10 @@ def draw_sort_menu(sortwin, pos, h, w):
         else:
             sortwin.addstr(idx+2,w//2-len(menu)//2, menu)    
     sortwin.refresh()
+#}
     
 
-def sort_menu_fun(stdscr, users):
+def sort_menu_fun(stdscr, users): #{
     h, w = stdscr.getmaxyx()
     sortwin = curses.newwin(15, 40, h//2-10, w//2-20)
     h, w = sortwin.getmaxyx()
@@ -197,6 +199,7 @@ def sort_menu_fun(stdscr, users):
                 users.sort(key=itemgetter(9))
             break
         draw_sort_menu(sortwin, pos, h, w)
+#}
 
 #Gathering user input with path to directory with certs
 def load_certs_input(stdscr, c): #{
@@ -215,8 +218,225 @@ def load_certs_input(stdscr, c): #{
     return message[:-1]
 #}
 
+def load_from_database_input(stdscr): #{
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    info = "Enter path to your database file [to end press Ctrl-G or ENTER]:"
+    stdscr.addstr(h//2-10, w//2-len(info)//2, info)
+    editwin = curses.newwin(1,100,h//2-5, w//2-50)
+    rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
+    stdscr.refresh()
+    box = curses.textpad.Textbox(editwin)
+    # Let the user edit until Ctrl-G is struck.
+    box.edit()
+    # Get resulting contents
+    message = box.gather()
+    return message[:-1]
+#}
+
+#Loading certs from database file (sqlite3)
+def load_from_database(stdscr): #{
+    h, w = stdscr.getmaxyx()
+    path_to_db = load_from_database_input(stdscr)
+    conn = sqlite3.connect(path_to_db)
+    if not os.path.exists(path_to_db):
+        text = "Failed to load certificates. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+    else:
+        text = "Loaded certificates to database. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+        return conn
+    
+
 #Loading certs from files
-def load_certificates(stdscr, c, path_to_dir): #{
+def load_certificates(stdscr, c): #{
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    path_to_dir = load_certs_input(stdscr, c)
+    if not os.path.exists(path_to_dir):
+        text = "Failed to load certificates. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+    else:
+        list_of_files = os.listdir(path_to_dir)
+        for filename in list_of_files:
+            user = cert_reader(stdscr, path_to_dir, filename)
+            c.execute('insert into users values (?,?,?,?,?,?,?,?,?,?)', user)
+        text = "Loaded certificates to database. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+#}
+
+def gen_random_users(stdscr, conn, c, n): #{
+    with open("names.txt", "r") as f_names:
+        names = f_names.read().splitlines()
+    with open("surnames.txt", "r") as f_surnames:
+        surnames = f_surnames.read().splitlines()
+    with open("states.txt", "r") as f_states:
+        states = f_states.read().splitlines()
+    for i in range(n):
+        ser_num = i+1
+        name = rd.choice(names)
+        surname = rd.choice(surnames)
+        emailAddress = name + "." + surname + "@" + rd.choice(["gmail.com", "onet.pl", "wp.pl", "random.mail.pl"])
+        filename = name[0] + surname + ".crt"
+        notBefore = str(rd.randint(2000,2009)) + "0" + str(rd.randint(1,9)) + str(rd.randint(10,29)) + "000000" + "Z"
+        if rd.randint(0,100) < 50:
+            notAfter = rd.randint(2010,2020)*pow(10,10) + 0 + rd.randint(1,9)*pow(10,8) + rd.randint(10,29)*pow(10,6) + 235959
+        else:
+            notAfter = 2020*pow(10,10) +  rd.randint(8,9)*pow(10,8) + rd.randint(10,29)*pow(10,6) + 235959
+        C = "PL"
+        ST = rd.choice(states)
+        O = rd.choice(["PW", "PWr", "UW", "AGH", "UKSW", "PJATK"])
+        OU = rd.choice(["Elektronika", "Informatyka", "Telekomunikacja", "Bioinformatyka", "Neuroinformatyka", "Teleinformatyka"])
+        CN = name + " " + surname
+        person = (ser_num, filename.lower(), notBefore, notAfter, C, ST, O, OU, CN, emailAddress.lower())
+        c.execute('insert into users values (?,?,?,?,?,?,?,?,?,?)', person)
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    txt = "Operation ended with success [ PRESS ANY KEY ]"
+    stdscr.addstr(h//2, w//2-len(txt)//2, txt)
+    stdscr.refresh()
+    stdscr.getch()
+#}
+
+#def draw_list_search_menu(sortwin, pos, h, w): #{
+#    sortwin.clear()
+#    sortwin.border()
+#    sort = "Search in"
+#    sortwin.addstr(0,w//2-len(sort)//2,sort, curses.color_pair(1))
+#    for idx, menu in enumerate(sort_menu):
+#        if idx == pos:
+#            sortwin.attron(curses.color_pair(1))
+#            sortwin.addstr(idx+2,w//2-len(menu)//2, menu)    
+#            sortwin.attroff(curses.color_pair(1))
+#        else:
+#            sortwin.addstr(idx+2,w//2-len(menu)//2, menu)    
+#    sortwin.refresh()
+#}
+
+#def list_search_input(stdscr): #{
+#    h, w = stdscr.getmaxyx()
+#    for i in range (10):
+#        for j in range (110):
+#            stdscr.addstr(h//2-(i+2), 55+w//2-(j), " ")
+#    rectangle(stdscr, h//2-12, w//2-55, h//2-2, w//2+55)
+#    info = "What are u looking for [to end press Ctrl-G or ENTER ]:"
+#    stdscr.addstr(h//2-10, w//2-len(info)//2, info)
+#    stdscr.refresh()
+#    editwin = curses.newwin(1,100, h//2-5, w//2-50)
+#    rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
+#    stdscr.refresh()
+#    box = curses.textpad.Textbox(editwin)
+#    # Let the user edit until Ctrl-G is struck.
+#    box.edit()
+#    # Get resulting contents
+#    message = box.gather()
+#    return message[:-1]
+#}
+
+#def list_search_menu(stdscr, users): #{
+#    h, w = stdscr.getmaxyx()
+#    searchwin = curses.newwin(15, 40, h//2-10, w//2-20)
+#    h, w = searchwin.getmaxyx()
+#    pos = 0 
+#    draw_list_search_menu(searchwin, pos, h, w)
+#    while True:
+#        key = stdscr.getch()
+#        if key==curses.KEY_UP and pos > 0:
+#            pos -= 1
+#        elif key==curses.KEY_DOWN and pos < len(sort_menu)-1:
+#            pos += 1
+#        elif key==curses.KEY_ENTER or key in [10,13]:
+#            if pos == 0:
+#                return 0
+#            elif pos == 1:
+#                return 1
+#            elif pos == 2:
+#                return 2
+#            elif pos == 3:
+#                return 3
+#            elif pos == 4:
+#                return 4
+#            elif pos == 5:
+#                return 5
+#            elif pos == 6:
+#                return 6
+#            elif pos == 7:
+#                return 7
+#            elif pos == 8:
+#                return 8
+#            elif pos == 9:
+#                return 9
+#        draw_list_search_menu(searchwin, pos, h, w)
+#}
+
+#def list_search(stdscr, users, pos, option):
+#    h, w = stdscr.getmaxyx()
+#    option = list_search_menu(stdscr, users)
+#    list_users(stdscr, users, pos, option) 
+#    pattern = list_search_input(stdscr)
+#    pos = next((x for i, x in enumerate(users) if x == pattern), 0)
+#    if pos == 0:
+#        warning = curses.newwin(30, 100, h//2-15, w//2-15)
+#        h_w, w_w = warning.getmaxyx()
+#        text = "Couldn't find any item"
+#        warning.addstr(h_w//2, w_w//2-len(text), text)
+#        warning.getch()
+#    return pos
+
+#Gathering user input with path to directory with certs
+def load_certs_input(stdscr, c): #{
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    info = "Enter path to directory with certificates [to end press Ctrl-G or ENTER ]:"
+    stdscr.addstr(h//2-10, w//2-len(info)//2, info)
+    editwin = curses.newwin(1,100, h//2-5, w//2-50)
+    rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
+    stdscr.refresh()
+    box = curses.textpad.Textbox(editwin)
+    # Let the user edit until Ctrl-G is struck.
+    box.edit()
+    # Get resulting contents
+    message = box.gather()
+    return message[:-1]
+#}
+
+def load_from_database_input(stdscr): #{
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    info = "Enter path to your database file [to end press Ctrl-G or ENTER]:"
+    stdscr.addstr(h//2-10, w//2-len(info)//2, info)
+    editwin = curses.newwin(1,100,h//2-5, w//2-50)
+    rectangle(stdscr, h//2-6, w//2-51, h//2-4, w//2+50)
+    stdscr.refresh()
+    box = curses.textpad.Textbox(editwin)
+    # Let the user edit until Ctrl-G is struck.
+    box.edit()
+    # Get resulting contents
+    message = box.gather()
+    return message[:-1]
+#}
+
+def load_from_database(stdscr): #{
+    h, w = stdscr.getmaxyx()
+    path_to_db = load_from_database_input(stdscr)
+    conn = sqlite3.connect(path_to_db)
+    if not os.path.exists(path_to_db):
+        text = "Failed to load certificates. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+    else:
+        text = "Loaded certificates to database. [ PRESS ANY KEY ]"
+        stdscr.addstr(h//2, w//2-len(text)//2, text)
+        stdscr.getch()
+        return conn
+    
+
+#Loading certs from files
+def load_certificates(stdscr, c): #{
     stdscr.clear()
     h, w = stdscr.getmaxyx()
     path_to_dir = load_certs_input(stdscr, c)
@@ -268,6 +488,7 @@ def gen_random_users(stdscr, conn, c, n): #{
 #}
 
 
+
 #20060618000000Z
 def list_users(stdscr, users, pos, option): #{
     now = datetime.now()
@@ -301,35 +522,36 @@ def list_users(stdscr, users, pos, option): #{
         #else:
         #    var = len(users)
         for i in range(0,min(h,len(users))-2):
-            serial_num = '{0:<5}'.format(users[pos+i][0])
-            filename = '{0:<20}'.format(users[pos+i][1])
-            not_before = users[pos+i][2]
-            not_after = users[pos+i][3]
-            C = '{0:<4}'.format(users[pos+i][4])
-            ST = '{0:<20}'.format(users[pos+i][5])
-            O = '{0:<10}'.format(users[pos+i][6])
-            OU = '{0:<18}'.format(users[pos+i][7])
-            CN = '{0:<25}'.format(users[pos+i][8])
-            email = '{0:<30}'.format(users[pos+i][9])
-            record = serial_num + filename + not_before + " " + not_after + " " + C + ST + O + OU + CN + email
-            if option == 0:
-                stdscr.addstr(i+1, 1, record)
-            elif option == 1:
-                if not_after > today:
-                    stdscr.attron(curses.color_pair(2))
+            if pos+i < len(users):
+                serial_num = '{0:<5}'.format(users[pos+i][0])
+                filename = '{0:<20}'.format(users[pos+i][1])
+                not_before = users[pos+i][2]
+                not_after = users[pos+i][3]
+                C = '{0:<4}'.format(users[pos+i][4])
+                ST = '{0:<20}'.format(users[pos+i][5])
+                O = '{0:<10}'.format(users[pos+i][6])
+                OU = '{0:<18}'.format(users[pos+i][7])
+                CN = '{0:<25}'.format(users[pos+i][8])
+                email = '{0:<30}'.format(users[pos+i][9])
+                record = serial_num + filename + not_before + " " + not_after + " " + C + ST + O + OU + CN + email
+                if option == 0:
                     stdscr.addstr(i+1, 1, record)
-                    stdscr.attroff(curses.color_pair(2))
-                else:
-                    stdscr.attron(curses.color_pair(3))
-                    stdscr.addstr(i+1, 1, record)
-                    stdscr.attroff(curses.color_pair(3))
-            elif option == 2:
-            #    if not_after < today:
-                    #stdscr.attron(curses.color_pair(3))
-                stdscr.addstr(i+1, 1, record, curses.color_pair(3))
-                    #stdscr.attroff(curses.color_pair(3))
+                elif option == 1:
+                    if not_after > today:
+                        stdscr.attron(curses.color_pair(2))
+                        stdscr.addstr(i+1, 1, record)
+                        stdscr.attroff(curses.color_pair(2))
+                    else:
+                        stdscr.attron(curses.color_pair(3))
+                        stdscr.addstr(i+1, 1, record)
+                        stdscr.attroff(curses.color_pair(3))
+                elif option == 2:
+                #    if not_after < today:
+                        #stdscr.attron(curses.color_pair(3))
+                    stdscr.addstr(i+1, 1, record, curses.color_pair(3))
+                        #stdscr.attroff(curses.color_pair(3))
     stdscr.attron(curses.color_pair(1))
-    stdscr.addstr(h-1,1,"q - quit | up_arrow - up | down_arrow - down | e - show expired | c - color list | a - page up | z - page down | s - sort list" )
+    stdscr.addstr(h-1,1,"q - quit | up_arrow - up | down_arrow - down | e - show expired | c - color list | a - page up | z - page down | s - sort list " )
     stdscr.attroff(curses.color_pair(1))
     stdscr.refresh()
 #}
@@ -356,7 +578,7 @@ def list_users_fun(stdscr, conn, c): #{
         key = stdscr.getch()
         if key==curses.KEY_UP and pos > 0:
             pos -= 1
-        elif key==curses.KEY_DOWN and pos < len(users)-h+2:
+        elif key==curses.KEY_DOWN and pos < len(tmp_users)-h+2:
             pos += 1
         elif key == 97 and pos > 0:
             if pos < h-2:
@@ -364,8 +586,8 @@ def list_users_fun(stdscr, conn, c): #{
             else:
                 pos -= h-2
         elif key == 122 :
-            if  len(users)-pos+2 < 2*h: 
-                pos = len(users) - h + 2
+            if  len(tmp_users)-pos+2 < 2*(h-2): 
+                pos = len(tmp_users) - h + 2
             else:
                 pos += h-2
         elif key == 99:
@@ -378,6 +600,7 @@ def list_users_fun(stdscr, conn, c): #{
                 option = 1
             list_users(stdscr, tmp_users, pos, option) 
         elif key == 101:
+            pos = 0
             if expired_on == True:
                 tmp_users = users
                 expired_on = False
@@ -391,7 +614,10 @@ def list_users_fun(stdscr, conn, c): #{
         elif key == 113:
             break
         elif key == 115:
+            pos = 0
             sort_menu_fun(stdscr, tmp_users)
+        elif key == 47:
+            list_search(stdscr, tmp_users, pos, option)
         list_users(stdscr, tmp_users, pos, option)
 #}
 
@@ -421,6 +647,7 @@ def main_menu_fun(stdscr, conn, c): #{
     curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_GREEN)
     curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_RED)
     curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    curses.init_pair(5, curses.COLOR_WHITE, curses.COLOR_BLUE)
     current_row = 0
     draw_menu(stdscr, current_row)
     h, w = stdscr.getmaxyx()
@@ -432,8 +659,9 @@ def main_menu_fun(stdscr, conn, c): #{
             current_row += 1
         elif key==curses.KEY_ENTER or key in [10,13]:
             if current_row == 0:    #   Load certificates from directory
-                path_to_dir = "_path_to_dir_"
-                load_certificates(stdscr , c, path_to_dir)
+                load_certificates(stdscr , c)
+            elif current_row == 1:  #   Load database
+                conn = load_from_database(stdscr)
             elif current_row == 2:  #   List certificates
                 list_users_fun(stdscr, conn, c)
             elif current_row == 3:  #   Enter Test menu
